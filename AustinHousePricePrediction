@@ -1,0 +1,171 @@
+#Get Working Directory
+getwd()
+#Download the library to read excel file
+library(readxl)
+library(psych)
+library(ggplot2)
+library(Hmisc)
+library(corrplot)
+library(dplyr)
+library(caret)
+library(car)
+library(stargazer)
+
+#Import the data
+data <- read_excel("austinHousing.xlsx")
+# View the data summary
+summary(data)
+# Descriptive statistics for the dataset
+mean(data$sale_price)
+median(data$sale_price)
+min(data$sale_price)
+max(data$sale_price)
+sd(data$sale_price)
+describe(data)
+# checking for missing values
+colSums(is.na(data))
+
+#Summary statistics by condition
+describeBy(data,data$sale_price)
+
+#Visualization
+boxplot(data$living_area, main = "boxplot of house size", ylab = "house size (sq ft)")
+hist(data$living_area, col = "blue", breaks = 20, main = "histogram of house size", xlab =
+       "house size (sq ft)")
+
+plot(data$bedrooms,data$sale_price,main="Price by Bedrooms")
+plot(data$living_area,data$sale_price,main= "Price by Living Area")
+
+ggplot(data=data) +
+  geom_point(mapping = aes(x= living_area, y = sale_price)) +
+  geom_smooth(method = "lm", formula = y~x, mapping = aes(x=living_area, y = sale_price)) +
+  labs(title = "price by living area", x="living area (sqft)", y="price ($)")
+
+ggplot(data=data) +
+  geom_point(mapping = aes(x= bedrooms, y = sale_price)) +
+  geom_smooth(method = "lm", formula = y~x, mapping = aes(x=bedrooms, y = sale_price)) +
+  labs(title = "price by number of bedrooms", x="number of bedrooms (no)", y="price ($)")
+ggplot(data=data) +
+  geom_point(mapping = aes(x= bathrooms, y = sale_price)) +
+  geom_smooth(method = "lm", formula = y~x, mapping = aes(x=bathrooms, y = sale_price)) +
+  labs(title = "price by number of bathrooms", x="bathrooms (no)", y="price ($)")
+ggplot(data=data) +
+  geom_point(mapping = aes(x= school_rating, y = sale_price)) +
+  geom_smooth(method = "lm", formula = y~x, mapping = aes(x=school_rating, y = sale_price)) +
+  labs(title = "price by school_rating", x="school rating (no)", y="price ($)")
+
+ggplot(data=data) +
+  geom_point(mapping = aes(x= property_tax_rate, y = sale_price)) +
+  geom_smooth(method = "lm", formula = y~x, mapping = aes(x=property_tax_rate, y = sale_price)) +
+  labs(title = "price by tax rate", x="property tax rate (no)", y="price ($)")
+
+
+
+ggplot(data=data) +
+  geom_point(mapping = aes(x= parking_spaces, y = sale_price)) +
+  geom_smooth(method = "lm", formula = y~x, mapping = aes(x=parking_spaces, y = sale_price)) +
+  labs(title = "price by Parking Spaces", x="Parking Spaces (no)", y="price ($)")
+
+ggplot(term5, aes(subscribed, age))
+
+
+
+
+# check for corelation between sale price and living area
+cor(x = data$living_area, y = data$sale_price, use = "complete.obs", method = "pearson")
+
+# The corelation is 0.4670339
+# corelation between bedrooms and sale price 
+cor(x = data$bedrooms, y = data$sale_price)
+0.2979451
+
+# corelation between bathrooms and sale price 
+cor(x = data$bathrooms, y = data$sale_price)
+0.5047382
+
+#corelation between parking spaces and sale price
+cor(x = data$parking_spaces, y = data$sale_price)
+0.1568106
+cor(x = data$property_tax_rate, y = data$sale_price)
+cor(x = data$year_built, y = data$sale_price)
+cor(x = data$house_type, y = data$sale_price)
+cor(x = data$school_rating, y = data$sale_price)
+
+# check for hypothesis
+cor.test(x = data$living_area, data$sale_price, conf.level = 0.99)
+
+# corelation matrice
+subdata<- data[c("living_area", "year_built", "bedrooms", "bathrooms" , "latest_sale_year", "parking_spaces" , "price_changes" ,"stories", "parking_features" , "sale_price")]
+cor(subdata)
+#p value for corelation matrix
+mdata = as.matrix(data[c("living_area", "year_built", "bedrooms", "bathrooms" , "latest_sale_year", "parking_spaces" ,  "price_changes" ,"stories", "parking_features" , "sale_price")])
+
+rcorr(mdata)
+
+#Pvalue is closer to zero.
+
+# corelation plot
+cor<- cor(subdata)
+cor_sort <- as.matrix(sort(cor[,'sale_price'], decreasing = TRUE))
+corrplot.mixed(cor, tl.col="black", tl.pos="lt")
+# Histogram of price
+hchart <- ggplot(data, aes(sale_price))
+hchart+ geom_histogram()
+
+
+
+# Correlation
+
+#Data Quality and Dealing with Outliers
+boxplot(data$sale_price)
+outliers <- boxplot(data$sale_price)$out
+data$sale_price[data$sale_price>12000000] <- NA
+summary(data$sale_price)
+
+
+# Change Qualitatitive variables to Numeric
+data$has_association <- as.factor(data$has_association)
+data$has_cooling <- as.factor(data$has_cooling)
+data$has_garage <- as.factor(data$has_garage)
+data$has_heating <- as.factor(data$has_heating)
+data$has_spa <- as.factor(data$has_spa)
+data$has_view <- as.factor(data$has_view)
+data$house_type <- as.factor(data$house_type)
+data$city <- as.factor(data$city)
+data <- data %>% mutate_if(is.character, as.factor)
+
+summary(data)
+     
+
+# Simple Linear Regression
+library(caret)
+set.seed(40462327)
+index <- createDataPartition(data$sale_price, times = 1, p = 0.8, list = FALSE)
+train <- data[index ,]
+test <- data[-index ,]
+
+#Model 1
+formula <- sale_price ~ living_area
+model1<- lm(formula,data = train)
+summary(model1)
+predictions <- predict(model1, test)
+postResample(predictions, test$sale_price)
+vif(model1)
+plot(model1)
+
+#Model 2
+formula <- sale_price ~ living_area + bedrooms + bathrooms + stories 
+model2<- lm(formula, data = train)
+summary(model2)
+predictions1 <- predict(model2, test)
+postResample(predictions1, test$sale_price)
+vif(model2)
+plot(model2)
+#model 3
+formula <- sale_price ~ living_area +  parking_spaces + school_rating  
+
+model3<- lm(formula, data = train)
+summary(model3)
+predictions2 <- predict(model3, test)
+postResample(predictions2, test$sale_price)
+plot(model3)
