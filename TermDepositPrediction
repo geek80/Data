@@ -1,0 +1,139 @@
+#Get Working Directory
+getwd()
+#Download the library to read excel file
+library(readxl)
+library(psych)
+library(ggplot2)
+library(Hmisc)
+library(corrplot)
+library(dplyr)
+library(caret)
+library(car)
+
+#Import the data
+term5 <- read_excel("termsv.xlsx")
+# View the data summary
+summary(term5)
+describe(term5)
+# change m to Male
+term5<-term5 %>%dplyr::mutate(gender = replace(gender,gender == "m", "Male"))
+describe(term5)
+#Outlier in Age
+boxplot(term5$age)
+term5$age[term5$age>100]<-NA
+
+# There are 23 missing values in marital status column
+colSums(is.na(term5))
+
+
+# Omit NA values
+term5 <- na.omit(term5)
+colSums(is.na(term5))
+
+# Visualizations
+qplot(term5$age)
+qplot(as.factor(term5$age))
+hist(term5$age)
+ggplot(data = term5) +
+  geom_bar(mapping = aes(x=personal_loan, y = subscribed), stat="summary") +
+  labs(title = "average house price by bedrooms", x="number of bedrooms", y="mean price ($)")
+
+table(term5$marital_status)
+barplot(table(term5$marital_status))
+barplot(table(term5$marital_status), col = "red", main = "house condition", xlab = "marital_status", ylab
+        = "frequency")
+
+example("plot")
+example("points")
+ggplot(term5, aes(x = contact_duration)) + 
+  geom_freqpoly(aes(color = credit_card), binwidth = 500, linewidth = 0.75)
+
+
+ggplot(term5, aes(subscribed, age,)) + 
+  geom_boxplot(aes(fill = subscribed), outlier.shape=TRUE) +
+  xlab("Did the customer take a term deposit?") + ylab("Average Age")
+
+ggplot(term5, aes(x = age, y = contact_duration)) +
+  geom_point(aes(color = gender)) +
+  geom_smooth(se = FALSE) +
+  labs(
+    x = "Engine displacement (L)",
+    y = "Highway fuel economy (mpg)",
+    color = "Car type",
+    title = "Fuel efficiency generally decreases with engine size",
+    caption = "Data from fueleconomy.gov"
+  )
+
+
+barplot(table(term5$occupation), main = "occupation", 
+        col = "skyblue" )
+# Chi square test
+table(term5$marital_status, term5$subscribed)
+chisq.test(term5$marital_status, term5$subscribed, correct = FALSE)
+
+# set seed
+library(caret)
+set.seed(1)
+index <- createDataPartition(term5$subscribed,p=0.8,list=FALSE)
+train <- term5[index,]
+test <- term5[-index,]
+
+#Model1
+
+model1<- train(formula, data = train, method = "glm")
+predictions<- predict(model1, test)
+postResample(predictions, test$subscribed)
+confusionMatrix(data=predictions, test$subscribed)
+
+formula<- subscribed ~ age 
+model1<- glm(formula, train, family = "binomial")
+summary(model1)
+train$predictedProbabilities <- fitted(model1)
+head(data.frame(train$predictedProbabilities, train$term5))
+
+
+exp(model1$coefficients)
+predictions<- predict(model1, test, type = "response")
+
+class_pred <- as.factor(ifelse(predictions > .5, "Yes", "No"))
+postResample(class_pred, test$subscribed)
+confusionMatrix(term_data=class_pred, test$subscribed)
+logisticPseudoR2s(model1)
+
+
+#model 2
+formula<- subscribed ~ age + salary 
+model2<- glm(formula, train, family = "binomial")
+summary(model2)
+library(car)
+logisticPseudoR2s <- function(LogModel) {
+  dev <- LogModel$deviance
+  nullDev <- LogModel$null.deviance
+  modelN <- length(LogModel$fitted.values)
+  R.l <- 1 - dev / nullDev
+  R.cs <- 1- exp ( -(nullDev - dev) / modelN)
+  R.n <- R.cs / ( 1 - ( exp (-(nullDev / modelN))))
+  cat("Pseudo R^2 for logistic regression\n")
+  cat("Hosmer and Lemeshow R^2 ", round(R.l, 3), "\n")
+  cat("Cox and Snell R^2 ", round(R.cs, 3), "\n")
+  cat("Nagelkerke R^2 ", round(R.n, 3), "\n")
+}
+logisticPseudoR2s(model2)
+
+
+logisticPseudoR2s(model2)
+predictions<- predict(model2, test, type = "response")
+class_pred <- as.factor(ifelse(predictions > .5, "Yes", "No"))
+postResample(class_pred, test$subscribed)
+confusionMatrix(term_data=class_pred, test$subscribed)
+
+# model3
+formula<- subscribed ~ age + salary + education_level
+model3<- train(formula, term_data = train, method = "glm")
+predictions<- predict(model3, test)
+postResample(predictions, test$subscribed)
+confusionMatrix(term_data=predictions, test$subscribed)
+
+train$cook <- cooks.distance(model1)
+sum(train$cook > 1)
+vif(model1)
