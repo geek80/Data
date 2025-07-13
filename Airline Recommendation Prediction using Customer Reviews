@@ -1,0 +1,443 @@
+Predicting Airline Recommendations using Customer Reviews
+
+# Import the necessary Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+#Read the data
+df = pd.read_csv("Airline_review_assignment_data.csv") 
+# Quick look at the data
+df.info()
+#Check percentage of missing values
+for col in df.columns:
+    msg = 'column: {:>10}\t Percent of NaN value: {:.2f}%'.format(col,100*(df[col].isnull().sum()/df[col].shape[0]))
+    print(msg)
+Data Cleaning
+#Impute Variables using Mode
+for column in ['Value For Money','Seat Type','Type Of Traveller','Seat Comfort', 'Cabin Staff Service', 'Food & Beverages', 'Ground Service']:
+    df[column].fillna(df[column].mode()[0], inplace=True)
+
+# implement mapping 'n' in Overall_Rating 
+def map_n_rating(x):
+    res = x
+    if x == 'n':
+        res = '1'
+    return res
+
+df["Overall_Rating"] = df["Overall_Rating"].apply(map_n_rating)
+Descriptive Statistics
+df.describe().transpose()
+Visualizations
+#Distribution of Overall Ratings
+plt.figure(figsize=(8, 5))
+sns.countplot(data=df, x="Overall_Rating", palette="Blues_d")
+plt.title("Distribution of Overall Ratings")
+plt.xlabel("Rating")
+plt.ylabel("Count")
+plt.show()
+Corelation Matrix
+# Select only numeric columns
+numeric_df = df.select_dtypes(include="number")
+plt.figure(figsize=(10, 6))
+sns.heatmap(numeric_df.corr(), annot=True, fmt=".2f", cmap="coolwarm", square=True)
+plt.title("Correlation Heatmap")
+plt.tight_layout()
+plt.show()
+#Value for Money by Traveller Type
+# Create the boxplot
+plt.figure(figsize=(10, 6))
+sns.boxplot(data=df, x='Type Of Traveller', y='Value For Money', palette='Set3')
+plt.title("Value for Money by Traveller Type")
+plt.xlabel("Traveller Type")
+plt.ylabel("Value for Money Rating")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+# Cabin Staff Service by Seat type
+# Create the boxplot
+plt.figure(figsize=(10, 6))
+sns.boxplot(data=df, x='Seat Type', y='Cabin Staff Service', palette='pastel')
+plt.title("Cabin Staff Service by Seat Type")
+plt.xlabel("Seat Type")
+plt.ylabel("Cabin Staff Service Rating")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+# Bar Plot: Airline vs % Recommended (Top 10 airlines)
+top_airlines = df['Airline Name'].value_counts().head(10).index
+recommendation_rate = df[df['Airline Name'].isin(top_airlines)].groupby('Airline Name')['Recommended'].value_counts(normalize=True).unstack().fillna(0)['yes'] * 100
+plt.subplot(2, 2, 3)
+sns.barplot(x=recommendation_rate.values, y=recommendation_rate.index, palette="coolwarm")
+plt.title("% Recommended by Airline (Top 10)")
+plt.xlabel("Recommendation Rate (%)")
+plt.ylabel("Airline Name")
+
+Bar Plot: Average Value For Money by Type Of Traveller
+plt.subplot(2, 2, 2)
+traveller_rating = df.groupby('Type Of Traveller')['Value For Money'].mean().sort_values()
+sns.barplot(x=traveller_rating.values, y=traveller_rating.index, palette="Blues_d")
+plt.title("Average 'Value For Money' by Traveller Type")
+plt.xlabel("Average Rating")
+plt.ylabel("Traveller Type")
+
+# Boxplot: Seat Comfort by Recommended
+sns.set(style="whitegrid")
+plt.figure(figsize=(18, 20))
+plt.subplot(2, 2, 1)
+sns.boxplot(data=df, x='Recommended', y='Seat Comfort')
+plt.title("Seat Comfort vs Recommended")
+plt.xlabel("Recommended")
+plt.ylabel("Seat Comfort Rating")
+Text Features vs Numeric Features
+Sentiment Analysis
+import pandas as pd
+import spacy
+import re
+from nltk.sentiment import SentimentIntensityAnalyzer
+import nltk
+
+# Download VADER lexicon if not already installed
+nltk.download("vader_lexicon")
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
+
+# Initialize VADER sentiment analyzer
+analyzer = SentimentIntensityAnalyzer()
+
+def preprocess_and_analyze(review):
+    """Clean text, remove stopwords, apply lemmatization, and return sentiment score."""
+    # Text Cleaning
+    text = re.sub(r"[^a-zA-Z0-9\s]", "", review)  # Remove special characters
+    text = re.sub(r"\s+", " ", text).strip().lower()  # Normalize spaces & lowercase
+
+    # Lemmatization & Stopword Removal
+    doc = nlp(text)
+    cleaned_text = " ".join([token.lemma_ for token in doc if not token.is_stop])
+
+    # Sentiment Analysis
+    sentiment_score = analyzer.polarity_scores(cleaned_text)["compound"]
+    return sentiment_score
+
+def classify_sentiment(score):
+    """Classify sentiment based on VADER compound score."""
+    return "Positive" if score >= 0.5 else "Negative" if score < 0 else "Neutral"
+
+#Get the data
+df = pd.read_csv("airline_clean.csv")
+
+# Apply sentiment analysis
+df["Sentiment Score"] = df['Review'].apply(preprocess_and_analyze)
+df["Sentiment"] = df["Sentiment Score"].apply(classify_sentiment)
+
+Descriptive Statistics for text features
+stats = df['Sentiment Score'].describe()
+print(stats)
+
+stats1 = df['Sentiment'].describe()
+print(stats1)
+
+Sentiment Score vs Overall Rating
+import plotly.express as px
+fig = px.violin(df, y="Sentiment Score", x="Overall_Rating",
+                box=True,
+                title="Sentiment Score by Overall Rating",
+                color_discrete_sequence=px.colors.qualitative.Prism,
+                hover_data=['Airline Name'])
+fig.show()
+Sentiment Score vs Seat Type
+fig = px.violin(df, y="Sentiment Score", x="Seat Type",
+                box=True,
+                title="Sentiment Score by Overall Rating",
+                color_discrete_sequence=px.colors.qualitative.Prism,
+                hover_data=['Airline Name'])
+fig.show()
+Bar Plot: Average Value For Money by Sentiment
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 2, 2)
+traveller_rating = df.groupby('Sentiment')['Value For Money'].mean().sort_values()
+sns.barplot(x=traveller_rating.values, y=traveller_rating.index, palette="Blues_d")
+plt.title("Average 'Value For Money' VS Sentiment")
+plt.xlabel("Average 'Value For Money Rating")
+plt.ylabel("Sentiment")
+Food & Beverages vs Sentiment
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 2, 2)
+traveller_rating = df.groupby('Sentiment')['Food & Beverages'].mean().sort_values()
+sns.barplot(x=traveller_rating.values, y=traveller_rating.index, palette="Blues_d")
+plt.title("Average 'Food & Beverages' VS Sentiment")
+plt.xlabel("Average 'Food & Beverages Rating")
+plt.ylabel("Sentiment")
+
+Seat Comfort vs Sentiment
+plt.subplot(2, 2, 1)
+sns.boxplot(data=df, x='Sentiment', y='Seat Comfort')
+plt.title("Seat Comfort vs Sentiment")
+plt.xlabel("Sentiment")
+plt.ylabel("Seat Comfort Rating")
+
+Word Cloud
+df = pd.read_csv("Airline_review_assignment_data.csv")
+import pandas as pd
+from wordcloud import WordCloud, STOPWORDS
+import matplotlib.pyplot as plt
+
+
+
+# Combine all review texts into a single string
+text = " ".join(str(review) for review in df['Review'].dropna())
+
+# Define stopwords (common words to exclude)
+stopwords = set(STOPWORDS)
+
+# Generate the word cloud
+wordcloud = WordCloud(
+    width=800,
+    height=400,
+    background_color='white',
+    stopwords=stopwords,
+    colormap='viridis',
+    max_words=200
+).generate(text)
+
+# Plot the word cloud
+plt.figure(figsize=(15, 7.5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis("off")
+plt.title("Word Cloud of Airline Reviews", fontsize=20)
+plt.show()
+
+Logistic Regression (Numeric Features)
+#Import the necessary Libraries
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+#Get the data
+df = pd.read_csv("airline_clean.csv")
+#Split the data into training and testing sets
+y = df.pop('Recommended')
+X = df
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, 
+                                                    random_state=101)
+X_train = X_train.replace((np.inf, -np.inf, np.nan), 0).reset_index(drop=True)
+
+# instantiate the model (using the default parameters)
+logreg = LogisticRegression(random_state=101)
+
+# fit the model with data
+logreg.fit(X_train, y_train)
+y_pred = logreg.predict(X_test)
+Print the confusion matrix and performance metrics (classification report)
+from sklearn import metrics
+cnf_matrix = metrics.confusion_matrix(y_test, y_pred)
+cnf_matrix
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+Support Vector Machine(Numeric Features)
+Import/install the necessary packages
+import pandas as pd
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn import svm
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+from sklearn.preprocessing import RobustScaler
+import numpy as np
+#Get the data
+df = pd.read_csv("airline_clean.csv")
+Split the data into training and testing sets
+y = df.pop('Recommended')
+X = df
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, 
+                                                    random_state=101)
+X_train = X_train.replace((np.inf, -np.inf, np.nan), 0).reset_index(drop=True)
+Robust scaling
+scaler = RobustScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+Create an SVM classifier
+classifier = svm.SVC()
+Define the hyperparameter grid to search
+hyperparameters = {'kernel': ['linear'],
+                   'C': [0.01, 0.1],
+                   'gamma': [0.01, 0.1]}
+Search the hyperparameter grid using GridSearchCV()
+grid_search = GridSearchCV(classifier, hyperparameters, cv=5) 
+grid_search.fit(X_train_scaled, y_train)
+Use the best model provided by the grid search to make predictions on the test data
+SVC(C=0.1, gamma=0.01, kernel='linear') 
+Print the confusion matrix and performance metrics (classification report)
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+Display the confusion matrix (heatmap)
+sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, cmap="YlGnBu")
+
+Logistic Regression (Text Features)
+#Import the necessary Libraries
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+#Get the data
+df = pd.read_csv("airline_clean.csv")
+# Convert the text features into dummy variables 
+pd.get_dummies(df['Type Of Traveller'])
+pd.get_dummies(df['Seat Type'])
+pd.get_dummies(df['Sentiment'])
+# Label Encoding
+from sklearn.preprocessing import LabelEncoder
+label_encoder = LabelEncoder()
+df['ST_encoded'] = label_encoder.fit_transform(df['Seat Type'])
+label_encoder = LabelEncoder()
+df['Senti_encoded'] = label_encoder.fit_transform(df['Sentiment'])
+label_encoder = LabelEncoder()
+df['TOT_encoded'] = label_encoder.fit_transform(df['Type Of Traveller'])
+#Split the data into training and testing sets
+y = df.pop('Recommended')
+X = df
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, 
+                                                    random_state=101)
+X_train = X_train.replace((np.inf, -np.inf, np.nan), 0).reset_index(drop=True)
+# instantiate the model (using the default parameters)
+logreg = LogisticRegression(random_state=101)
+
+# fit the model with data
+logreg.fit(X_train, y_train)
+
+y_pred = logreg.predict(X_test)
+Print the confusion matrix and performance metrics (classification report)
+from sklearn import metrics
+cnf_matrix = metrics.confusion_matrix(y_test, y_pred)
+cnf_matrix
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+Support Vector Machine(Text Features)
+Import/install the necessary packages
+import pandas as pd
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn import svm
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+from sklearn.preprocessing import RobustScaler
+import numpy as np
+#Get the data
+df = pd.read_csv("airline_clean.csv")
+# Convert the text features into dummy variables 
+pd.get_dummies(df['Type Of Traveller'])
+pd.get_dummies(df['Seat Type'])
+pd.get_dummies(df['Sentiment'])
+# Label Encoding
+from sklearn.preprocessing import LabelEncoder
+label_encoder = LabelEncoder()
+df['ST_encoded'] = label_encoder.fit_transform(df['Seat Type'])
+label_encoder = LabelEncoder()
+df['Senti_encoded'] = label_encoder.fit_transform(df['Sentiment'])
+label_encoder = LabelEncoder()
+df['TOT_encoded'] = label_encoder.fit_transform(df['Type Of Traveller'])
+Split the data into training and testing sets
+y = df.pop('Recommended')
+X = df
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, 
+                                                    random_state=101)
+X_train = X_train.replace((np.inf, -np.inf, np.nan), 0).reset_index(drop=True)
+Robust scaling
+scaler = RobustScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+Create an SVM classifier
+classifier = svm.SVC()
+Define the hyperparameter grid to search
+hyperparameters = {'kernel': ['linear'],
+                   'C': [0.01, 0.1],
+                   'gamma': [0.01, 0.1]}
+Search the hyperparameter grid using GridSearchCV()
+grid_search = GridSearchCV(classifier, hyperparameters, cv=5) 
+grid_search.fit(X_train_scaled, y_train)
+Use the best model provided by the grid search to make predictions on the test data
+SVC(C=0.1, gamma=0.01, kernel='linear') 
+Print the confusion matrix and performance metrics (classification report)
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+Display the confusion matrix (heatmap)
+sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, cmap="YlGnBu")
+
+Logistic Regression(Hybrid Model)
+# Read the CSV files into pandas DataFrames
+df_num = df.select_dtypes(include=['float64'])
+df_text = text = df.select_dtypes(include=['object'])
+file1 = 'df_num.csv'
+file2 = 'df_text.csv'
+df1 = pd.read_csv(file1)
+df2 = pd.read_csv(file2)
+# Concatenate the two DataFrames vertically
+final_df = pd.concat([df1, df2], ignore_index=True)
+# Print or save the combined DataFrame
+ final_df
+# final_df.to_csv('airline_final.csv', index=False)
+Logistic Regression
+#Import the necessary Libraries
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+#Get the data
+df = pd.read_csv("airline_final.csv")
+#Split the data into training and testing sets
+y = df.pop('Recommended')
+X = df
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, 
+                                                    random_state=101)
+X_train = X_train.replace((np.inf, -np.inf, np.nan), 0).reset_index(drop=True)
+
+# instantiate the model (using the default parameters)
+logreg = LogisticRegression(random_state=101)
+
+# fit the model with data
+logreg.fit(X_train, y_train)
+y_pred = logreg.predict(X_test)
+Print the confusion matrix and performance metrics (classification report)
+from sklearn import metrics
+cnf_matrix = metrics.confusion_matrix(y_test, y_pred)
+cnf_matrix
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+Support Vector Machine
+Import/install the necessary packages
+import pandas as pd
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn import svm
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+from sklearn.preprocessing import RobustScaler
+import numpy as np
+#Get the data
+df = pd.read_csv("airline_final.csv")
+Split the data into training and testing sets
+y = df.pop('Recommended')
+X = df
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.3, 
+                                                    random_state=101)
+X_train = X_train.replace((np.inf, -np.inf, np.nan), 0).reset_index(drop=True)
+Robust scaling
+scaler = RobustScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+Create an SVM classifier
+classifier = svm.SVC()
+Define the hyperparameter grid to search
+hyperparameters = {'kernel': ['linear'],
+                   'C': [0.01, 0.1],
+                   'gamma': [0.01, 0.1]}
+Search the hyperparameter grid using GridSearchCV()
+grid_search = GridSearchCV(classifier, hyperparameters, cv=5) 
+grid_search.fit(X_train_scaled, y_train)
+Use the best model provided by the grid search to make predictions on the test data
+SVC(C=0.1, gamma=0.01, kernel='linear') 
+Print the confusion matrix and performance metrics (classification report)
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+Display the confusion matrix (heatmap)
+sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, cmap="YlGnBu")
+plt.show()
+
